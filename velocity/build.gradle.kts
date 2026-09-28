@@ -28,13 +28,13 @@ tasks {
 }
 
 // XMine start - публикация в свой Reposilite
-// Своя координата ru.xmine.thirdparty:sonar-velocity в разделе third-party - оттуда jar
-// берёт VelocityServer (plugins.yml). Версия - настоящий maven-SNAPSHOT, приходит из
-// xmine-publish.yml через -PxmineVersion: для SNAPSHOT Reposilite сам ведёт
-// maven-metadata.xml, без которого fetch.py образа не соберёт имя файла.
-// Значение по умолчанию - только чтобы локальная сборка без -P не падала.
+// Своя координата ru.xmine.thirdparty:sonar-velocity в разделе-кандидате пары форков
+// fork-snapshot (вики, ADR-0056) - оттуда jar берёт VelocityServer (plugins.yml).
+// Версия неизменяема и считается из коммита в xmine-publish.yml, сюда приходит через
+// -PxmineVersion, раздел - через XMINE_MAVEN_URL. Значения по умолчанию - только чтобы
+// локальная сборка без них не падала.
 publishing {
-  publications.create<MavenPublication>("xmineThirdParty") {
+  publications.create<MavenPublication>("xmineFork") {
     groupId = "ru.xmine.thirdparty"
     artifactId = "sonar-velocity"
     version = providers.gradleProperty("xmineVersion").getOrElse("0.0.0-xmine-local-SNAPSHOT")
@@ -45,7 +45,7 @@ publishing {
   repositories {
     maven {
       name = "xmine"
-      url = uri(providers.environmentVariable("XMINE_MAVEN_URL").getOrElse("https://maven.xmine.world/third-party"))
+      url = uri(providers.environmentVariable("XMINE_MAVEN_URL").getOrElse("https://maven.xmine.world/fork-snapshot"))
       credentials {
         username = providers.environmentVariable("XMINE_MAVEN_USERNAME").orNull
         password = providers.environmentVariable("XMINE_MAVEN_PASSWORD").orNull
