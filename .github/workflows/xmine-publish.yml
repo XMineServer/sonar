@@ -1,0 +1,106 @@
+# Публикация нашей сборки Sonar для Velocity в свой Reposilite, раздел third-party - тот же,
+# откуда её берёт VelocityServer (plugins.yml, координата ru.xmine.thirdparty:sonar-velocity).
+#
+# Что в форке изменено: токены перевода. Прокси, которая переводит игрока на
+# другую прокси сети (например, перед перезапуском), кладёт ему в куку подписанный
+# JWT (SonarVelocityTransfer); принимающая прокси при входе через перевод
+# запрашивает куку и при верном токене пропускает игрока без проверки.
+# Секция конфига transfer-token, сервис - TransferTokenService в api.
+#
+# ЭТОТ РЕПОЗИТОРИЙ ПУБЛИЧНЫЙ, поэтому `runs-on` здесь - только раннеры GitHub и
+# никогда `self-hosted` (вики, infra/ci.md, «Граница безопасности: только
+# приватные репозитории»). По той же причине нет триггера `pull_request`, а job
+# не запускается в форках самого форка.
+#
+# Триггер - только workflow_dispatch, как у XMineServer/Grim: секреты
+# XMINE_MAVEN_USERNAME / XMINE_MAVEN_PASSWORD заводит владелец.
+#
+# Апстримный gradle.yml не трогается: он собирает только ветку main.
+
+name: XMine - publish Sonar
+
+on:
+  workflow_dispatch:
+
+# Публикация не должна идти в два потока: параллельные сборки означали бы гонку
+# за то, чей номер снапшота окажется последним в maven-metadata.xml.
+concurrency:
+  group: xmine-publish-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  # xmine.1 - номер нашей правки поверх апстримной 2.1.50, билды снапшота
+  # нумерует сам Reposilite.
+  XMINE_VERSION: 2.1.50-xmine.1-SNAPSHOT
+  XMINE_MAVEN_URL: https://maven.xmine.world/third-party
+  MAVEN_GROUP_PATH: ru/xmine/thirdparty
+  MAVEN_ARTIFACT: sonar-velocity
+
+jobs:
+  publish:
+    if: github.repository == 'XMineServer/sonar'
+    runs-on: ubuntu-latest
+
+    env:
+      XMINE_MAVEN_USERNAME: ${{ secrets.XMINE_MAVEN_USERNAME }}
+      XMINE_MAVEN_PASSWORD: ${{ secrets.XMINE_MAVEN_PASSWORD }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Fail early without credentials
+        run: |
+          set -eu
+          if [ -z "${XMINE_MAVEN_USERNAME:-}" ] || [ -z "${XMINE_MAVEN_PASSWORD:-}" ]; then
+            echo "::error::Secrets XMINE_MAVEN_USERNAME / XMINE_MAVEN_PASSWORD are not set"
+            exit 1
+          fi
+
+      - name: Test
+        # Только своя правка: у апстрима тестов нет, наш набор - в api.
+        run: ./gradlew :api:test --stacktrace
+
+      - name: Build
+        run: ./gradlew :velocity:shadowJar --stacktrace
+
+      - name: Publish snapshot to Reposilite
+        run: |
+          ./gradlew :velocity:publishXmineThirdPartyPublicationToXmineRepository \
+            -PxmineVersion="${XMINE_VERSION}" --stacktrace
+
+      - name: Verify metadata round-trip
+        # "Опубликовано" должно означать больше, чем ответ 2xx: читаем
+        # maven-metadata.xml обратно - без timestamp/buildNumber fetch.py образа
+        # не соберёт имя файла.
+        run: |
+          set -eu
+          BASE="${XMINE_MAVEN_URL}/${MAVEN_GROUP_PATH}/${MAVEN_ARTIFACT}/${XMINE_VERSION}"
+          curl --fail-with-body --silent --show-error \
+               --user "${XMINE_MAVEN_USERNAME}:${XMINE_MAVEN_PASSWORD}" \
+               -o /tmp/maven-metadata.xml "${BASE}/maven-metadata.xml"
+          TIMESTAMP="$(sed -n 's:.*<timestamp>\(.*\)</timestamp>.*:\1:p' /tmp/maven-metadata.xml)"
+          BUILD_NUMBER="$(sed -n 's:.*<buildNumber>\(.*\)</buildNumber>.*:\1:p' /tmp/maven-metadata.xml)"
+          if [ -z "$TIMESTAMP" ] || [ -z "$BUILD_NUMBER" ]; then
+            echo "::error::maven-metadata.xml has no complete versioning/snapshot"
+            cat /tmp/maven-metadata.xml
+            exit 1
+          fi
+          {
+            echo "### Published"
+            echo '```'
+            echo "ru.xmine.thirdparty:${MAVEN_ARTIFACT}:${XMINE_VERSION}"
+            echo "${MAVEN_ARTIFACT}-${XMINE_VERSION%-SNAPSHOT}-${TIMESTAMP}-${BUILD_NUMBER}.jar"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

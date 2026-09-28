@@ -60,6 +60,27 @@ database:
   # Hoeveel dagen moet Sonar geverifieerde spelers in de database bewaren?
   maximum-age: 5
 
+# XMine: lets a player moved here by another proxy of the same network skip the verification.
+# Before a transfer, the sending proxy stores a signed token in the player's cookie
+# (SonarVelocityTransfer); this proxy asks for it when the player logs in through a transfer
+# and lets the player in without the verification if the token is valid.
+# Only Velocity supports it, and only for 1.20.5+ clients. Requires accepts-transfers = true.
+transfer-token:
+  # Should Sonar accept and issue transfer tokens?
+  enabled: false
+  # Cookie that carries the token; must be the same on every proxy of the network
+  cookie-key: "sonar:transfer_token"
+  # How many seconds a token stays valid after it has been issued
+  lifetime: 60
+  # How many milliseconds to wait for the client to send the cookie
+  response-timeout: 5000
+  # Environment variable with the signing secret shared by all proxies (at least 32 bytes).
+  # The secret itself is never written to this file.
+  secret-env: SONAR_TRANSFER_TOKEN_SECRET
+  # Environment variable with the previous secret, accepted but no longer used for signing.
+  # Set it while rotating the secret, so tokens issued with the old one keep working.
+  previous-secret-env: SONAR_TRANSFER_TOKEN_SECRET_PREVIOUS
+
 # Elk nieuw inlogverzoek wordt in de wachtrij geplaatst om spam-join-aanvallen te voorkomen
 # De wachtrij wordt elke seconde bijgewerkt (20 ticks)
 queue:

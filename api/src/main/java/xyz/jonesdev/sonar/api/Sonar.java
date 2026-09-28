@@ -32,6 +32,7 @@ import xyz.jonesdev.sonar.api.notification.ChatNotificationHandler;
 import xyz.jonesdev.sonar.api.statistics.SonarStatistics;
 import xyz.jonesdev.sonar.api.timer.SystemTimer;
 import xyz.jonesdev.sonar.api.tracker.AttackTracker;
+import xyz.jonesdev.sonar.api.transfer.TransferTokenService;
 
 import java.text.DecimalFormat;
 import java.util.UUID;
@@ -84,6 +85,15 @@ public interface Sonar {
    * @return The {@link VerifiedPlayerController} instance.
    */
   VerifiedPlayerController getVerifiedPlayerController();
+
+  /**
+   * Gets the service for tokens that let a player transferred from another
+   * proxy of the same network skip the verification.
+   * On Velocity, use {@code SonarVelocityTransfer} to transfer a player with a token.
+   *
+   * @return The {@link TransferTokenService} instance, disabled unless configured.
+   */
+  @NotNull TransferTokenService getTransferTokens();
 
   /**
    * Gets the handler for action bar notifications.

@@ -28,4 +28,6 @@ public interface ChannelPipelines {
   String SONAR_PACKET_DECODER = "sonar-packet-decoder";
   String SONAR_TAIL_EXCEPTIONS = "sonar-exception-tail";
   String SONAR_BANDWIDTH = "sonar-bandwidth-counter";
+  // XMine: waits for the cookie with the transfer token during login
+  String SONAR_TRANSFER_COOKIE = "sonar-transfer-cookie";
 }

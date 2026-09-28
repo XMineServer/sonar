@@ -152,6 +152,14 @@ public final class SonarConfiguration {
     database.type = Database.Type.valueOf(generalConfig.getString("database.type").toUpperCase());
     database.maximumAge = clamp(generalConfig.getInt("database.maximum-age"), 1, 365);
 
+    // XMine: transfer tokens
+    transferToken.enabled = generalConfig.getBoolean("transfer-token.enabled");
+    transferToken.cookieKey = generalConfig.getString("transfer-token.cookie-key");
+    transferToken.lifetimeSeconds = clamp(generalConfig.getInt("transfer-token.lifetime"), 5, 600);
+    transferToken.responseTimeout = clamp(generalConfig.getInt("transfer-token.response-timeout"), 500, 30000);
+    transferToken.secretEnv = generalConfig.getString("transfer-token.secret-env");
+    transferToken.previousSecretEnv = generalConfig.getString("transfer-token.previous-secret-env");
+
     // Queue
     queue.maxQueuePolls = clamp(generalConfig.getInt("queue.max-polls"), 1, 1000);
 
@@ -322,6 +330,8 @@ public final class SonarConfiguration {
   private final Database database = new Database();
   @Getter
   private final Webhook webhook = new Webhook();
+  @Getter
+  private final TransferToken transferToken = new TransferToken();
 
   @Getter
   private Component prefix;
@@ -497,6 +507,22 @@ public final class SonarConfiguration {
 
     private Type type;
     private int maximumAge;
+  }
+
+  // XMine: a proxy that moves a player to another proxy of the same network
+  // hands out a signed token in a cookie; the receiving proxy skips the
+  // verification for a valid one (see TransferTokenService).
+  @Getter
+  @NoArgsConstructor(access = AccessLevel.PRIVATE)
+  public static final class TransferToken {
+    private boolean enabled;
+    private String cookieKey;
+    private int lifetimeSeconds;
+    private int responseTimeout;
+    // Names of environment variables, not the secrets themselves:
+    // the configuration file is not a place for a signing key.
+    private String secretEnv;
+    private String previousSecretEnv;
   }
 
   @Getter

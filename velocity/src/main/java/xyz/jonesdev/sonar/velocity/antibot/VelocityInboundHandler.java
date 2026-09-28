@@ -18,15 +18,23 @@
 package xyz.jonesdev.sonar.velocity.antibot;
 
 import com.velocitypowered.proxy.connection.MinecraftConnection;
+import com.velocitypowered.proxy.protocol.packet.ClientboundCookieRequestPacket;
 import com.velocitypowered.proxy.protocol.packet.HandshakePacket;
 import com.velocitypowered.proxy.protocol.packet.ServerLoginPacket;
 import io.netty.channel.ChannelHandlerContext;
+import net.kyori.adventure.key.Key;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import xyz.jonesdev.sonar.common.InboundHandlerAdapter;
 
 import java.net.InetSocketAddress;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
+import static com.velocitypowered.proxy.network.Connections.MINECRAFT_DECODER;
+import static xyz.jonesdev.sonar.api.antibot.ChannelPipelines.SONAR_TRANSFER_COOKIE;
 import static xyz.jonesdev.sonar.common.protocol.packets.handshake.HandshakePacket.STATUS;
+import static xyz.jonesdev.sonar.common.protocol.packets.handshake.HandshakePacket.TRANSFER;
 
 final class VelocityInboundHandler extends InboundHandlerAdapter {
 
@@ -37,6 +45,7 @@ final class VelocityInboundHandler extends InboundHandlerAdapter {
       if (handshake.getNextStatus() == STATUS) {
         ctx.pipeline().remove(this);
       } else {
+        transferIntent = handshake.getNextStatus() == TRANSFER;
         handleHandshake(ctx, handshake.getServerAddress(), handshake.getProtocolVersion().getProtocol());
       }
     } else if (msg instanceof ServerLoginPacket serverLogin) {
@@ -49,5 +58,21 @@ final class VelocityInboundHandler extends InboundHandlerAdapter {
       return;
     }
     ctx.fireChannelRead(msg);
+  }
+
+  @Override
+  protected boolean requestTransferToken(final @NotNull ChannelHandlerContext ctx,
+                                         final @NotNull String cookieKey,
+                                         final int timeoutMillis,
+                                         final @NotNull Consumer<byte @Nullable []> callback) {
+    // This handler has already left the pipeline, the cookie is caught by its own one
+    final Key key = Key.key(cookieKey);
+    final TransferCookieHandler handler = new TransferCookieHandler(key, callback);
+    ctx.pipeline().addAfter(MINECRAFT_DECODER, SONAR_TRANSFER_COOKIE, handler);
+    final ChannelHandlerContext handlerContext = ctx.pipeline().context(handler);
+    handler.setTimeout(ctx.channel().eventLoop().schedule(
+      () -> handler.complete(handlerContext, null), timeoutMillis, TimeUnit.MILLISECONDS));
+    ctx.channel().writeAndFlush(new ClientboundCookieRequestPacket(key));
+    return true;
   }
 }

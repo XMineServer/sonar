@@ -24,7 +24,9 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import xyz.jonesdev.sonar.api.Sonar;
 import xyz.jonesdev.sonar.api.antibot.protocol.ProtocolVersion;
+import xyz.jonesdev.sonar.api.database.model.VerifiedPlayer;
 import xyz.jonesdev.sonar.api.fingerprint.FingerprintingUtil;
+import xyz.jonesdev.sonar.api.transfer.TransferTokenService;
 import xyz.jonesdev.sonar.common.netty.SonarTimeoutHandler;
 import xyz.jonesdev.sonar.common.protocol.SonarPacket;
 import xyz.jonesdev.sonar.common.protocol.SonarPacketEncoder;
@@ -39,6 +41,7 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 import static xyz.jonesdev.sonar.api.antibot.ChannelPipelines.*;
 import static xyz.jonesdev.sonar.common.protocol.SonarPacketPreparer.*;
@@ -50,6 +53,8 @@ public abstract class InboundHandlerAdapter extends ChannelInboundHandlerAdapter
   protected ProtocolVersion protocolVersion;
   protected @Nullable String handshakeHostname;
   protected @Nullable RemovalListener channelRemovalListener;
+  // XMine: the handshake asked for a login through a transfer (1.20.5+)
+  protected boolean transferIntent;
 
   /**
    * Validates and handles incoming handshake packets
@@ -149,6 +154,66 @@ public abstract class InboundHandlerAdapter extends ChannelInboundHandlerAdapter
       return;
     }
 
+    // XMine: a player moved here by another proxy of the network brings a token
+    // proving the verification was passed there. Only a login through a transfer
+    // is asked for it, so an ordinary login costs no extra round trip.
+    final TransferTokenService transferTokens = Sonar.get0().getTransferTokens();
+    if (transferIntent && transferTokens.isEnabled() && !geyser
+      && requestTransferToken(ctx, transferTokens.getCookieKey(), transferTokens.getResponseTimeout(),
+      token -> onTransferToken(ctx, initialLoginAction, username, inetAddress, fingerprint, token))) {
+      return;
+    }
+
+    queueVerification(ctx, username, inetAddress, fingerprint, geyser);
+  }
+
+  /**
+   * Asks the client for the cookie holding the transfer token.
+   * The callback must be run exactly once, in the channel's event loop:
+   * with the payload, or with {@code null} if the client sent none in time.
+   *
+   * @return false if the platform cannot ask for a cookie during login
+   */
+  protected boolean requestTransferToken(final @NotNull ChannelHandlerContext ctx,
+                                         final @NotNull String cookieKey,
+                                         final int timeoutMillis,
+                                         final @NotNull Consumer<byte @Nullable []> callback) {
+    return false;
+  }
+
+  private void onTransferToken(final @NotNull ChannelHandlerContext ctx,
+                               final @NotNull Runnable initialLoginAction,
+                               final @NotNull String username,
+                               final @NotNull InetAddress inetAddress,
+                               final @NotNull String fingerprint,
+                               final byte @Nullable [] token) {
+    if (!ctx.channel().isActive()) {
+      return;
+    }
+    final TransferTokenService.Verdict verdict = Sonar.get0().getTransferTokens().verify(token, username, inetAddress);
+    // A missing token is a transfer from outside the network, nothing to report
+    if (verdict != TransferTokenService.Verdict.MISSING) {
+      Sonar.get0().getLogger().info("Transfer token of {}/{}: {}.",
+        username, Sonar.get0().getConfig().formatAddress(inetAddress), verdict);
+    }
+    try {
+      if (verdict == TransferTokenService.Verdict.VALID) {
+        // Verified on another proxy of the network - remember it here as well
+        Sonar.get0().getVerifiedPlayerController().add(new VerifiedPlayer(fingerprint, System.currentTimeMillis()));
+        initialLogin(ctx.channel(), inetAddress, initialLoginAction);
+      } else {
+        queueVerification(ctx, username, inetAddress, fingerprint, false);
+      }
+    } catch (Exception exception) {
+      ctx.fireExceptionCaught(exception);
+    }
+  }
+
+  private void queueVerification(final @NotNull ChannelHandlerContext ctx,
+                                 final @NotNull String username,
+                                 final @NotNull InetAddress inetAddress,
+                                 final @NotNull String fingerprint,
+                                 final boolean geyser) {
     // Check if the IP address is currently being rate-limited
     if (!Sonar.get0().getAntiBot().getRatelimiter().attempt(inetAddress)) {
       customDisconnect(ctx.channel(), reconnectedTooFast, protocolVersion);

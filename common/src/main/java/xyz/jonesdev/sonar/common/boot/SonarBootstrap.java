@@ -36,6 +36,7 @@ import xyz.jonesdev.sonar.api.notification.ActionBarNotificationHandler;
 import xyz.jonesdev.sonar.api.notification.ChatNotificationHandler;
 import xyz.jonesdev.sonar.api.statistics.SonarStatistics;
 import xyz.jonesdev.sonar.api.timer.SystemTimer;
+import xyz.jonesdev.sonar.api.transfer.TransferTokenService;
 import xyz.jonesdev.sonar.common.protocol.SonarPacketPreparer;
 import xyz.jonesdev.sonar.common.ratelimit.CaffeineCacheRatelimiter;
 import xyz.jonesdev.sonar.common.ratelimit.NoopCacheRatelimiter;
@@ -57,6 +58,7 @@ public abstract class SonarBootstrap<T> implements Sonar {
   private ChatNotificationHandler chatNotificationHandler;
   private SonarConfiguration config;
   private VerifiedPlayerController verifiedPlayerController;
+  private TransferTokenService transferTokens = TransferTokenService.DISABLED;
   private final LibraryManager libraryManager;
   private final SonarStatistics statistics;
   private final SonarPlatform platform;
@@ -169,6 +171,8 @@ public abstract class SonarBootstrap<T> implements Sonar {
       verifiedPlayerController.close();
     }
     verifiedPlayerController = new VerifiedPlayerController(libraryManager);
+
+    transferTokens = TransferTokenService.fromConfig(getConfig().getTransferToken(), System::getenv, getLogger());
   }
 
   public final void shutdown() {
