@@ -5,6 +5,8 @@ adventure-platform = "4.4.1"
 bstats = "3.2.1"
 libby = "2.0.0-SNAPSHOT"
 pluginyml = "0.6.0"
+jedis = "6.2.0"
+testcontainers = "2.0.5"
 
 [plugins]
 indra-git = "net.kyori.indra.git:3.2.0"
@@ -29,6 +31,8 @@ libby-velocity = { module = "com.alessiodp.libby:libby-velocity", version.ref = 
 bstats-bungee = { module = "org.bstats:bstats-bungeecord", version.ref = "bstats" }
 bstats-bukkit = { module = "org.bstats:bstats-bukkit", version.ref = "bstats" }
 bstats-velocity = { module = "org.bstats:bstats-velocity", version.ref = "bstats" }
+# XMine: shared verified list; MIT, no Netty, connects lazily
+jedis = { module = "redis.clients:jedis", version.ref = "jedis" }
 imagefilters = "com.jhlabs:filters:2.0.235-1"
 caffeine = "com.github.ben-manes.caffeine:caffeine:3.2.4"
 annotations = "org.jetbrains:annotations:26.1.0"

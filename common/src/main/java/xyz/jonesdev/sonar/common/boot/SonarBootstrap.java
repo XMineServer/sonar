@@ -36,7 +36,9 @@ import xyz.jonesdev.sonar.api.notification.ActionBarNotificationHandler;
 import xyz.jonesdev.sonar.api.notification.ChatNotificationHandler;
 import xyz.jonesdev.sonar.api.statistics.SonarStatistics;
 import xyz.jonesdev.sonar.api.timer.SystemTimer;
+import xyz.jonesdev.sonar.api.shared.SharedVerifiedStore;
 import xyz.jonesdev.sonar.api.transfer.TransferTokenService;
+import xyz.jonesdev.sonar.common.shared.RedisSharedVerifiedStore;
 import xyz.jonesdev.sonar.common.protocol.SonarPacketPreparer;
 import xyz.jonesdev.sonar.common.ratelimit.CaffeineCacheRatelimiter;
 import xyz.jonesdev.sonar.common.ratelimit.NoopCacheRatelimiter;
@@ -59,6 +61,7 @@ public abstract class SonarBootstrap<T> implements Sonar {
   private SonarConfiguration config;
   private VerifiedPlayerController verifiedPlayerController;
   private TransferTokenService transferTokens = TransferTokenService.DISABLED;
+  private SharedVerifiedStore sharedVerified = SharedVerifiedStore.DISABLED;
   private final LibraryManager libraryManager;
   private final SonarStatistics statistics;
   private final SonarPlatform platform;
@@ -173,6 +176,11 @@ public abstract class SonarBootstrap<T> implements Sonar {
     verifiedPlayerController = new VerifiedPlayerController(libraryManager);
 
     transferTokens = TransferTokenService.fromConfig(getConfig().getTransferToken(), System::getenv, getLogger());
+
+    // XMine: the shared list is rebuilt on every reload, the old one is closed first
+    sharedVerified.close();
+    sharedVerified = RedisSharedVerifiedStore.fromConfig(getConfig().getSharedVerified(),
+      getConfig().getDatabase().getMaximumAge(), System::getenv, getLogger());
   }
 
   public final void shutdown() {
@@ -184,6 +192,7 @@ public abstract class SonarBootstrap<T> implements Sonar {
     if (verifiedPlayerController != null) {
       verifiedPlayerController.close();
     }
+    sharedVerified.close();
     // Run the per-platform disable method
     disable();
     // Thank the user for using Sonar

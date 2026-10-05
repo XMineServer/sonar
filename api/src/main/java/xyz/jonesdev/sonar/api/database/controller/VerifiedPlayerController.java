@@ -167,6 +167,8 @@ public final class VerifiedPlayerController {
         dao.delete(player);
         if (removeExisting) {
           cache.remove(player.getFingerprint());
+          // XMine: a shared entry must not bring the player back to another proxy
+          Sonar.get0().getSharedVerified().remove(player.getFingerprint());
         }
       }
       Sonar.get0().getLogger().info("Removed {} database entries older than {} days.",
@@ -182,6 +184,8 @@ public final class VerifiedPlayerController {
    */
   public void remove(final @NotNull String fingerprint) {
     cache.remove(fingerprint);
+    // XMine: a shared entry must not bring the player back from another proxy
+    Sonar.get0().getSharedVerified().remove(fingerprint);
 
     // Don't try to update the column if the database type is NONE
     if (cachedDatabaseType == SonarConfiguration.Database.Type.NONE) {
@@ -244,6 +248,8 @@ public final class VerifiedPlayerController {
    */
   public void clearAll() {
     cache.clear();
+    // XMine: forget the verified players of the whole network
+    Sonar.get0().getSharedVerified().removeAll();
 
     // Delete the entire table from the database, if necessary
     if (connectionSource != null

@@ -81,6 +81,25 @@ transfer-token:
   # Set it while rotating the secret, so tokens issued with the old one keep working.
   previous-secret-env: SONAR_TRANSFER_TOKEN_SECRET_PREVIOUS
 
+# XMine: players verified on any proxy of the network, kept in Redis. A player who passed the
+# verification on one proxy does not pass it again on another, and stays verified after a restart.
+# Redis is never required: if it is down, slow or fails, the player is simply verified as usual.
+# The connection details are read from environment variables, never from this file.
+shared-verified:
+  # Should Sonar share verified players through Redis?
+  enabled: false
+  # Names of the environment variables with the Redis host, port, user and password.
+  # The port defaults to 6379; the user and the password may be left unset.
+  host-env: REDIS_HOST
+  port-env: REDIS_PORT
+  username-env: REDIS_USERNAME
+  password-env: REDIS_PASSWORD
+  # Prefix of the keys Sonar creates. Add your own identifier if several networks use one Redis.
+  # Only keys with this prefix are ever removed.
+  key-prefix: "sonar:verified:"
+  # How many milliseconds to wait for Redis before verifying the player as usual
+  timeout: 300
+
 # Każde nowe logowanie będzie kolejkowane w celu uniknięcia ataków typu spam join.
 # Kolejka jest aktualizowana co 1 sekundę (20 tików).
 queue:

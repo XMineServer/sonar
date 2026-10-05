@@ -26,6 +26,7 @@ import xyz.jonesdev.sonar.api.Sonar;
 import xyz.jonesdev.sonar.api.antibot.protocol.ProtocolVersion;
 import xyz.jonesdev.sonar.api.database.model.VerifiedPlayer;
 import xyz.jonesdev.sonar.api.fingerprint.FingerprintingUtil;
+import xyz.jonesdev.sonar.api.shared.SharedVerifiedStore;
 import xyz.jonesdev.sonar.api.transfer.TransferTokenService;
 import xyz.jonesdev.sonar.common.netty.SonarTimeoutHandler;
 import xyz.jonesdev.sonar.common.protocol.SonarPacket;
@@ -154,6 +155,50 @@ public abstract class InboundHandlerAdapter extends ChannelInboundHandlerAdapter
       return;
     }
 
+    // XMine: another proxy of the network may have verified the player already.
+    // The answer comes later, so the rest of the login continues from there.
+    final SharedVerifiedStore sharedVerified = Sonar.get0().getSharedVerified();
+    if (sharedVerified.isEnabled()) {
+      sharedVerified.contains(fingerprint).whenComplete((found, throwable) ->
+        ctx.executor().execute(() -> onSharedLookup(ctx, initialLoginAction, username, inetAddress,
+          fingerprint, geyser, found != null && found)));
+      return;
+    }
+
+    continueWithoutCache(ctx, initialLoginAction, username, inetAddress, fingerprint, geyser);
+  }
+
+  private void onSharedLookup(final @NotNull ChannelHandlerContext ctx,
+                              final @NotNull Runnable initialLoginAction,
+                              final @NotNull String username,
+                              final @NotNull InetAddress inetAddress,
+                              final @NotNull String fingerprint,
+                              final boolean geyser,
+                              final boolean found) {
+    if (!ctx.channel().isActive()) {
+      return;
+    }
+    try {
+      if (found) {
+        if (ProtocolUtil.DEBUG) {
+          Sonar.get0().getLogger().info("[debug] {} is skipped: verified on another proxy of the network.", username);
+        }
+        Sonar.get0().getVerifiedPlayerController().getCache().add(fingerprint);
+        initialLogin(ctx.channel(), inetAddress, initialLoginAction);
+      } else {
+        continueWithoutCache(ctx, initialLoginAction, username, inetAddress, fingerprint, geyser);
+      }
+    } catch (Exception exception) {
+      ctx.fireExceptionCaught(exception);
+    }
+  }
+
+  private void continueWithoutCache(final @NotNull ChannelHandlerContext ctx,
+                                    final @NotNull Runnable initialLoginAction,
+                                    final @NotNull String username,
+                                    final @NotNull InetAddress inetAddress,
+                                    final @NotNull String fingerprint,
+                                    final boolean geyser) {
     // XMine: a player moved here by another proxy of the network brings a token
     // proving the verification was passed there. Only a login through a transfer
     // is asked for it, so an ordinary login costs no extra round trip.
@@ -199,7 +244,9 @@ public abstract class InboundHandlerAdapter extends ChannelInboundHandlerAdapter
     try {
       if (verdict == TransferTokenService.Verdict.VALID) {
         // Verified on another proxy of the network - remember it here as well
-        Sonar.get0().getVerifiedPlayerController().add(new VerifiedPlayer(fingerprint, System.currentTimeMillis()));
+        final long now = System.currentTimeMillis();
+        Sonar.get0().getVerifiedPlayerController().add(new VerifiedPlayer(fingerprint, now));
+        Sonar.get0().getSharedVerified().add(fingerprint, now);
         initialLogin(ctx.channel(), inetAddress, initialLoginAction);
       } else {
         queueVerification(ctx, username, inetAddress, fingerprint, false);

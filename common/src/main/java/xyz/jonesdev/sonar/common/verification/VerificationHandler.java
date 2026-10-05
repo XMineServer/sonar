@@ -50,6 +50,8 @@ public abstract class VerificationHandler implements SonarPacketListener {
     // Add verified player to the database
     Sonar.get0().getVerifiedPlayerController().add(new VerifiedPlayer(
       user.getFingerprint(), user.getLoginTimer().getStart()));
+    // XMine: let the other proxies of the network know as well
+    Sonar.get0().getSharedVerified().add(user.getFingerprint(), user.getLoginTimer().getStart());
 
     // Call the VerifySuccessEvent for external API usage
     Sonar.get0().getEventManager().publish(new UserVerifySuccessEvent(user));

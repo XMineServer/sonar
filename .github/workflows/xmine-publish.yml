@@ -111,8 +111,9 @@ jobs:
 
       - name: Test
         if: steps.exists.outputs.found == 'false'
-        # Только своя правка: у апстрима тестов нет, наш набор — в api.
-        run: ./gradlew :api:test --stacktrace
+        # Только своя правка: у апстрима тестов нет, наш набор — в api и common
+        # (общий список проверенных; интеграционные тесты берут Redis через Docker раннера).
+        run: ./gradlew :api:test :common:test --stacktrace
 
       - name: Build
         if: steps.exists.outputs.found == 'false'

@@ -29,6 +29,7 @@ import xyz.jonesdev.sonar.api.event.SonarEventManager;
 import xyz.jonesdev.sonar.api.logger.LoggerWrapper;
 import xyz.jonesdev.sonar.api.notification.ActionBarNotificationHandler;
 import xyz.jonesdev.sonar.api.notification.ChatNotificationHandler;
+import xyz.jonesdev.sonar.api.shared.SharedVerifiedStore;
 import xyz.jonesdev.sonar.api.statistics.SonarStatistics;
 import xyz.jonesdev.sonar.api.timer.SystemTimer;
 import xyz.jonesdev.sonar.api.tracker.AttackTracker;
@@ -94,6 +95,13 @@ public interface Sonar {
    * @return The {@link TransferTokenService} instance, disabled unless configured.
    */
   @NotNull TransferTokenService getTransferTokens();
+
+  /**
+   * Gets the list of verified players shared by all proxies of the network.
+   *
+   * @return The {@link SharedVerifiedStore} instance, disabled unless configured.
+   */
+  @NotNull SharedVerifiedStore getSharedVerified();
 
   /**
    * Gets the handler for action bar notifications.

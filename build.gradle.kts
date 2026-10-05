@@ -63,6 +63,10 @@ allprojects {
       relocate("org.h2", "xyz.jonesdev.sonar.libs.h2")
       relocate("com.jhlabs", "xyz.jonesdev.sonar.libs.jhlabs")
       relocate("org.postgresql", "xyz.jonesdev.sonar.libs.postgresql")
+      // XMine: Jedis and what it needs (other proxy plugins ship their own Redis clients)
+      relocate("redis.clients.jedis", "xyz.jonesdev.sonar.libs.jedis")
+      relocate("org.apache.commons.pool2", "xyz.jonesdev.sonar.libs.pool2")
+      relocate("redis.clients.authentication", "xyz.jonesdev.sonar.libs.authx")
 
       // Exclude unnecessary metadata information
       exclude("META-INF/*/**")

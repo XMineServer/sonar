@@ -160,6 +160,15 @@ public final class SonarConfiguration {
     transferToken.secretEnv = generalConfig.getString("transfer-token.secret-env");
     transferToken.previousSecretEnv = generalConfig.getString("transfer-token.previous-secret-env");
 
+    // XMine: verified players shared through Redis
+    sharedVerified.enabled = generalConfig.getBoolean("shared-verified.enabled");
+    sharedVerified.hostEnv = generalConfig.getString("shared-verified.host-env");
+    sharedVerified.portEnv = generalConfig.getString("shared-verified.port-env");
+    sharedVerified.usernameEnv = generalConfig.getString("shared-verified.username-env");
+    sharedVerified.passwordEnv = generalConfig.getString("shared-verified.password-env");
+    sharedVerified.keyPrefix = generalConfig.getString("shared-verified.key-prefix");
+    sharedVerified.timeout = clamp(generalConfig.getInt("shared-verified.timeout"), 50, 5000);
+
     // Queue
     queue.maxQueuePolls = clamp(generalConfig.getInt("queue.max-polls"), 1, 1000);
 
@@ -332,6 +341,8 @@ public final class SonarConfiguration {
   private final Webhook webhook = new Webhook();
   @Getter
   private final TransferToken transferToken = new TransferToken();
+  @Getter
+  private final SharedVerified sharedVerified = new SharedVerified();
 
   @Getter
   private Component prefix;
@@ -523,6 +534,22 @@ public final class SonarConfiguration {
     // the configuration file is not a place for a signing key.
     private String secretEnv;
     private String previousSecretEnv;
+  }
+
+  // XMine: verified players of all proxies of a network in one Redis, so a
+  // player verified on one proxy is not verified again on another (see SharedVerifiedStore).
+  @Getter
+  @NoArgsConstructor(access = AccessLevel.PRIVATE)
+  public static final class SharedVerified {
+    private boolean enabled;
+    // Names of environment variables, not the values themselves
+    private String hostEnv;
+    private String portEnv;
+    private String usernameEnv;
+    private String passwordEnv;
+    private String keyPrefix;
+    // Milliseconds
+    private int timeout;
   }
 
   @Getter
